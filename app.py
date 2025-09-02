@@ -37,5 +37,9 @@ def submit():
             ])
     return jsonify({'status': 'success'})
 
+@app.route('/results.csv')
+def download_results():
+    return send_from_directory('.', 'results.csv', as_attachment=True)
+
 if __name__ == '__main__':
     app.run(debug=True)
