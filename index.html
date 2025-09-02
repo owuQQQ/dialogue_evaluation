@@ -20,6 +20,10 @@
   <p id="status"></p>
 
   <script>
+    if (!sessionStorage.getItem("sawGuidance")) {
+    sessionStorage.setItem("sawGuidance", "true");
+    window.location.href = "guidance.html";
+  }
     let dialogues = [];
     let dialogueIds = [];
     let currentIndex = 0;
