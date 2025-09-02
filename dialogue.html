@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dialogue Quality Survey</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: auto; }
+    .dialogue { margin: 20px 0; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+    .question { margin-top: 10px; }
+    button { margin-top: 20px; padding: 10px 20px; }
+    #button-row { display: flex; gap: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Human/Machine Generated Dialogue Quality Survey</h2>
+  <div id="dialogue-container"></div>
+  <div id="button-row">
+    <button id="backBtn">Back</button>
+    <button id="continueBtn">Continue</button>
+  </div>
+  <p id="status"></p>
+
+  <script>
+    let dialogues = [];
+    let dialogueIds = [];
+    let currentIndex = 0;
+    let maxDialogues = 30;
+    let userId = "";
+    let answers = [];
+
+    window.onload = function() {
+      while (!userId) {
+        userId = prompt("Please enter your participant ID (required):");
+        if (userId === null) {
+          alert("Participant ID is required to proceed.");
+        }
+      }
+    };
+
+    fetch("samples.txt")
+      .then(response => response.text())
+      .then(text => {
+        const rawDialogues = text.trim().split("\n\n");
+        rawDialogues.forEach(d => {
+          const lines = d.split("\n");
+          dialogueIds.push(lines[0].trim()); // first line is the dialogue ID
+          dialogues.push(lines.slice(1).join("\n")); // rest is the dialogue
+        });
+        showDialogue();
+      });
+
+    function showDialogue() {
+      if (currentIndex >= maxDialogues || currentIndex >= dialogues.length) {
+        document.getElementById("status").textContent = "✅ Survey complete! Thank you.";
+        document.getElementById("continueBtn").disabled = true;
+        document.getElementById("backBtn").disabled = true;
+        saveToCSV();
+        return;
+      }
+
+      let dialogueBlock = dialogues[currentIndex].split("\n");
+      let container = document.getElementById("dialogue-container");
+      container.innerHTML = "";
+
+      let block = document.createElement("div");
+      block.className = "dialogue";
+
+      dialogueBlock.forEach(line => {
+        let p = document.createElement("p");
+        p.textContent = line;
+        block.appendChild(p);
+      });
+      let questions = [
+        "Is the dialogue understandable?",
+        "How natural does the dialogue feel?",
+        "Does the usage of backchannels and fillers make this dialogue feel more natural?"
+      ];
+
+      for (let i = 0; i < 3; i++) {
+        let q = document.createElement("div");
+        q.className = "question";
+        // Question text
+        let qText = document.createElement("div");
+        qText.textContent = questions[i];
+        q.appendChild(qText);
+        // Radio buttons in a row
+        let radioDiv = document.createElement("div");
+        radioDiv.style.display = "flex";
+        radioDiv.style.gap = "10px";
+        for (let j = 1; j <= 5; j++) {
+          let label = document.createElement("label");
+          let radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = `q${i+1}`;
+          radio.value = j;
+          // Pre-select if answer exists
+          if (answers[currentIndex] && answers[currentIndex][i] == j) {
+            radio.checked = true;
+          }
+          label.appendChild(radio);
+          label.appendChild(document.createTextNode(j));
+          radioDiv.appendChild(label);
+        }
+        q.appendChild(radioDiv);
+        block.appendChild(q);
+      }
+      container.appendChild(block);
+
+      // Disable Back button on first dialogue
+      document.getElementById("backBtn").disabled = currentIndex === 0;
+      // Enable Continue button if not finished
+      document.getElementById("continueBtn").disabled = false;
+    }
+
+    document.getElementById("continueBtn").addEventListener("click", function() {
+      // Collect answers for current dialogue
+      let response = [];
+      let allAnswered = true;
+      for (let i = 0; i < 3; i++) {
+        let radios = document.getElementsByName(`q${i+1}`);
+        let selected = "";
+        for (let radio of radios) {
+          if (radio.checked) {
+            selected = radio.value;
+            break;
+          }
+        }
+        if (!selected) {
+          allAnswered = false;
+        }
+        response.push(selected);
+      }
+      if (!allAnswered) {
+        alert("Please answer all questions before continuing.");
+        return;
+      }
+      answers[currentIndex] = response; // Save or overwrite
+      currentIndex++;
+      showDialogue();
+    });
+
+    document.getElementById("backBtn").addEventListener("click", function() {
+      // Save current answers before going back
+      let response = [];
+      for (let i = 0; i < 3; i++) {
+        let radios = document.getElementsByName(`q${i+1}`);
+        let selected = "";
+        for (let radio of radios) {
+          if (radio.checked) {
+            selected = radio.value;
+            break;
+          }
+        }
+        response.push(selected);
+      }
+      answers[currentIndex] = response; // Save or overwrite
+      if (currentIndex > 0) {
+        currentIndex--;
+        showDialogue();
+      }
+    });
+
+    function saveToCSV() {
+      const results = [];
+      for (let i = 0; i < answers.length; i++) {
+        results.push({
+          id: userId,
+          dialogue_id: dialogueIds[i],
+          dialogue_index: i + 1,
+          understandable: answers[i][0],
+          natural: answers[i][1],
+          backchannels: answers[i][2]
+        });
+      }
+
+      fetch('https://apply_from_rendering.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ results })
+      })
+      .then(response => {
+        if (response.ok) {
+          document.getElementById("status").textContent += " (Results submitted to server)";
+        } else {
+          document.getElementById("status").textContent += " (Failed to submit results)";
+        }
+      })
+      .catch(() => {
+        document.getElementById("status").textContent += " (Failed to submit results)";
+      });
+    }
+  </script>
