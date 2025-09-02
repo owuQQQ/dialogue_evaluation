@@ -8,7 +8,7 @@ CORS(app)  # Enable CORS for all routes
 
 @app.route('/')
 def index():
-    with open('dialogue.html', encoding='utf-8') as f:
+    with open('index.html', encoding='utf-8') as f:
         html = f.read()
     return render_template_string(html)
 
